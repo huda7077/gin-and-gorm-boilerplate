@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/huda7077/gin-and-gorm-boilerplate/internal/services"
 	"github.com/huda7077/gin-and-gorm-boilerplate/models"
+	"github.com/huda7077/gin-and-gorm-boilerplate/pkg/exceptions"
 )
 
 type ProductController struct {
@@ -19,15 +20,10 @@ func NewProductController(service *services.ProductService) *ProductController {
 func (ctr *ProductController) GetAll(c *gin.Context) {
 	products, err := ctr.Service.GetAll()
 	if err != nil {
-		c.JSON(500, gin.H{
-			"success": false,
-			"message": err.Error(),
-			"data":    nil,
-		})
-
+		c.Error(exceptions.NotFoundError{Message: "Products not found"})
 	}
 	c.JSON(200, gin.H{
-		"success": true,
+		"code":    200,
 		"message": "Get products successfully",
 		"data":    products,
 	})
@@ -37,23 +33,15 @@ func (ctr *ProductController) Create(c *gin.Context) {
 	var req *models.Product
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{
-			"success": false,
-			"message": err.Error(),
-			"data":    nil,
-		})
+		c.Error(exceptions.ValidationError{Message: err.Error()})
 		return
 	}
 	if err := ctr.Service.Create(req.Name, req.Price, req.Stock); err != nil {
-		c.JSON(500, gin.H{
-			"success": false,
-			"message": err.Error(),
-			"data":    nil,
-		})
+		c.Error(exceptions.ConflictError{Message: err.Error()})
 		return
 	}
 	c.JSON(200, gin.H{
-		"success": true,
+		"code":    200,
 		"message": "Create product successfully",
 		"data": gin.H{
 			"name":  req.Name,

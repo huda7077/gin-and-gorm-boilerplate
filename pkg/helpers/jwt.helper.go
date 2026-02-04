@@ -1,14 +1,18 @@
 package helpers
 
 import (
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/huda7077/gin-and-gorm-boilerplate/models"
 )
 
-func GenerateJWT(Id string, role string, JWTExpiryTime time.Duration, JWTSecretKey string) (string, error) {
+func GenerateJWT(Id uint, email string, role models.Role, JWTExpiryTime time.Duration) (string, error) {
+	JWTSecretKey := os.Getenv("JWT_SECRET")
 	claims := jwt.MapClaims{
 		"userId": Id,
+		"email":  email,
 		"role":   role,
 		"exp":    time.Now().Add(JWTExpiryTime).Unix(),
 	}

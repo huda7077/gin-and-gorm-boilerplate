@@ -6,26 +6,38 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/huda7077/gin-and-gorm-boilerplate/configs"
+	"github.com/huda7077/gin-and-gorm-boilerplate/internal/repositories"
 	"github.com/huda7077/gin-and-gorm-boilerplate/internal/routes"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	port := 8080
+	// Load configuration
+	config := configs.New()
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Warning: .env file not found")
-	}
-
+	// Connect to database
 	configs.ConnectDatabase()
 
-	r := routes.SetupRouter()
+	// Initialize repositories
+	repos := repositories.NewRepositories(configs.DB)
+
+	// Setup router with dependencies
+	r := routes.SetupRouter(repos, config)
+
+	// Health check endpoint
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "pong",
 		})
 	})
 
-	r.Run(fmt.Sprintf(":%d", port))
+	// Start server
+	port := config.Get("APP_PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Server starting on port %s...", port)
+	if err := r.Run(fmt.Sprintf(":%s", port)); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }

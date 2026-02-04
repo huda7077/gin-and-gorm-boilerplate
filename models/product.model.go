@@ -16,3 +16,7 @@ type Product struct {
 	UpdatedAt time.Time      `json:"updatedAt"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"deletedAt"`
 }
+
+func (u *Product) TableName() string {
+	return "products"
+}

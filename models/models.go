@@ -1,5 +1,7 @@
 package models
 
-var All = []any{
+var AllModels = []any{
 	&Product{},
+	&User{},
+	&VerificationCode{},
 }
