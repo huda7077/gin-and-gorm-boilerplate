@@ -151,7 +151,7 @@ func (ctrl *AuthController) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	exceptions.SuccessResponse(c, http.StatusOK, "if email exists, reset code has been sent", nil)
+	exceptions.SuccessResponse(c, http.StatusOK, "reset code has been sent, please check your email", nil)
 }
 
 // ResetPassword handles reset password request

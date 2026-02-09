@@ -12,6 +12,7 @@ import (
 	"github.com/huda7077/gin-and-gorm-boilerplate/pkg/exceptions"
 	"github.com/huda7077/gin-and-gorm-boilerplate/pkg/helpers"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // AuthService defines methods for authentication operations
@@ -50,8 +51,9 @@ func NewAuthService(repositories *repositories.Repositories, config configs.Conf
 }
 
 // Register creates a new user account and sends verification email
+// Uses DB transaction to ensure atomicity
 func (s *authServiceImpl) Register(ctx context.Context, reqBody dto.AuthRegisterRequest) error {
-	// Check if email already exists
+	// Check if email already exists (outside transaction for performance)
 	existingUser, _ := s.repositories.User.FindByEmail(ctx, reqBody.Email)
 	if existingUser.ID != 0 {
 		return exceptions.NewConflictError("email already registered")
@@ -63,66 +65,80 @@ func (s *authServiceImpl) Register(ctx context.Context, reqBody dto.AuthRegister
 		return exceptions.NewInternalServerError("failed to hash password")
 	}
 
-	// Create user
-	user := models.User{
-		Name:     reqBody.Name,
-		Email:    reqBody.Email,
-		Password: string(hashedPassword),
-		Role:     models.RoleUser,
-	}
-
-	createdUser, err := s.repositories.User.Create(ctx, user)
-	if err != nil {
-		return exceptions.NewInternalServerError("failed to create user")
-	}
-
 	// Generate OTP
 	otp, err := helpers.GenerateOTP()
 	if err != nil {
 		return exceptions.NewInternalServerError("failed to generate verification code")
 	}
 
-	// Save verification code
-	expiredMinutes := 10
-	verificationCode := models.VerificationCode{
-		UserID:    createdUser.ID,
-		Code:      otp,
-		Purpose:   "EMAIL_VERIFICATION",
-		ExpiredAt: time.Now().Add(time.Duration(expiredMinutes) * time.Minute),
-	}
+	var createdUser models.User
 
-	_, err = s.repositories.VerificationCode.Create(ctx, verificationCode)
+	// Start transaction
+	err = s.repositories.DB.Transaction(func(tx *gorm.DB) error {
+		// Create transaction-aware repositories
+		txRepos := s.repositories.WithTx(tx)
+
+		// Create user
+		user := models.User{
+			Name:     reqBody.Name,
+			Email:    reqBody.Email,
+			Password: string(hashedPassword),
+			Role:     models.RoleUser,
+		}
+
+		createdUser, err = txRepos.User.Create(ctx, user)
+		if err != nil {
+			return err
+		}
+
+		// Save verification code
+		expiredMinutes := 10
+		verificationCode := models.VerificationCode{
+			UserID:    createdUser.ID,
+			Code:      otp,
+			Purpose:   "EMAIL_VERIFICATION",
+			ExpiredAt: time.Now().Add(time.Duration(expiredMinutes) * time.Minute),
+		}
+
+		_, err = txRepos.VerificationCode.Create(ctx, verificationCode)
+		if err != nil {
+			return err
+		}
+
+		// Transaction will be committed if no error is returned
+		return nil
+	})
+
 	if err != nil {
-		return exceptions.NewInternalServerError("failed to save verification code")
+		return exceptions.NewInternalServerError("failed to create user")
 	}
 
-	// Send verification email
+	// Send verification email (outside transaction - non-critical operation)
+	// If email fails, user is still created and can resend verification
 	emailData := struct {
 		OTP            string
 		ExpiredMinutes int
 	}{
 		OTP:            otp,
-		ExpiredMinutes: expiredMinutes,
+		ExpiredMinutes: 10,
 	}
 
-	err = s.mailProvider.SendMail(
+	_ = s.mailProvider.SendMail(
 		createdUser.Email,
 		"Verify Your Email Address",
 		"verify-account.html",
 		emailData,
 	)
-	if err != nil {
-		// Log error but don't fail registration
-		// In production, you might want to use a queue for emails
-		return exceptions.NewInternalServerError("failed to send verification email")
-	}
+	// Note: We don't return error if email fails, as user is already created
+	// User can use resend verification endpoint
 
 	return nil
 }
 
 // VerifyEmail verifies user email with OTP code
+// Uses DB transaction to ensure atomicity
 func (s *authServiceImpl) VerifyEmail(ctx context.Context, reqBody dto.AuthVerifyAccountRequest) error {
-	// Find user by email
+	// Find user by email (outside transaction)
 	user, err := s.repositories.User.FindByEmail(ctx, reqBody.Email)
 	if err != nil {
 		return exceptions.NewNotFoundError("user not found")
@@ -133,27 +149,46 @@ func (s *authServiceImpl) VerifyEmail(ctx context.Context, reqBody dto.AuthVerif
 		return exceptions.NewBadRequestError("email already verified", nil)
 	}
 
-	// Find and validate verification code
-	_, err = s.repositories.VerificationCode.FindValidCode(ctx, user.ID, reqBody.Otp, "EMAIL_VERIFICATION")
-	if err != nil {
-		return exceptions.NewBadRequestError("invalid or expired verification code", nil)
-	}
+	// Start transaction
+	err = s.repositories.DB.Transaction(func(tx *gorm.DB) error {
+		txRepos := s.repositories.WithTx(tx)
 
-	// Update user verified_at
-	now := time.Now()
-	user.VerifiedAt = &now
-	_, err = s.repositories.User.Update(ctx, int(user.ID), user)
+		// Find and validate verification code
+		_, err = txRepos.VerificationCode.FindValidCode(ctx, user.ID, reqBody.Otp, "EMAIL_VERIFICATION")
+		if err != nil {
+			return exceptions.NewBadRequestError("invalid or expired verification code", nil)
+		}
+
+		// Update user verified_at
+		now := time.Now()
+		user.VerifiedAt = &now
+		_, err = txRepos.User.Update(ctx, int(user.ID), user)
+		if err != nil {
+			return err
+		}
+
+		// Delete used verification code
+		err = txRepos.VerificationCode.DeleteByUser(ctx, user.ID, "EMAIL_VERIFICATION")
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
+		// Check if it's already our custom error
+		if _, ok := err.(*exceptions.AppError); ok {
+			return err
+		}
 		return exceptions.NewInternalServerError("failed to verify email")
 	}
-
-	// Delete used verification code
-	_ = s.repositories.VerificationCode.DeleteByUser(ctx, user.ID, "EMAIL_VERIFICATION")
 
 	return nil
 }
 
 // ResendVerificationCode resends verification email
+// Uses DB transaction to ensure atomicity
 func (s *authServiceImpl) ResendVerificationCode(ctx context.Context, reqBody dto.AuthResendOTPRequest) error {
 	// Find user by email
 	user, err := s.repositories.User.FindByEmail(ctx, reqBody.Email)
@@ -166,36 +201,50 @@ func (s *authServiceImpl) ResendVerificationCode(ctx context.Context, reqBody dt
 		return exceptions.NewBadRequestError("email already verified", nil)
 	}
 
-	// Delete old verification codes
-	_ = s.repositories.VerificationCode.DeleteByUser(ctx, user.ID, "EMAIL_VERIFICATION")
-
 	// Generate new OTP
 	otp, err := helpers.GenerateOTP()
 	if err != nil {
 		return exceptions.NewInternalServerError("failed to generate verification code")
 	}
 
-	// Save new verification code
-	expiredMinutes := 10
-	verificationCode := models.VerificationCode{
-		UserID:    user.ID,
-		Code:      otp,
-		Purpose:   "EMAIL_VERIFICATION",
-		ExpiredAt: time.Now().Add(time.Duration(expiredMinutes) * time.Minute),
-	}
+	// Start transaction
+	err = s.repositories.DB.Transaction(func(tx *gorm.DB) error {
+		txRepos := s.repositories.WithTx(tx)
 
-	_, err = s.repositories.VerificationCode.Create(ctx, verificationCode)
+		// Delete old verification codes
+		err = txRepos.VerificationCode.DeleteByUser(ctx, user.ID, "EMAIL_VERIFICATION")
+		if err != nil {
+			return err
+		}
+
+		// Save new verification code
+		expiredMinutes := 10
+		verificationCode := models.VerificationCode{
+			UserID:    user.ID,
+			Code:      otp,
+			Purpose:   "EMAIL_VERIFICATION",
+			ExpiredAt: time.Now().Add(time.Duration(expiredMinutes) * time.Minute),
+		}
+
+		_, err = txRepos.VerificationCode.Create(ctx, verificationCode)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		return exceptions.NewInternalServerError("failed to save verification code")
 	}
 
-	// Send verification email
+	// Send verification email (outside transaction)
 	emailData := struct {
 		OTP            string
 		ExpiredMinutes int
 	}{
 		OTP:            otp,
-		ExpiredMinutes: expiredMinutes,
+		ExpiredMinutes: 10,
 	}
 
 	err = s.mailProvider.SendMail(
@@ -254,6 +303,7 @@ func (s *authServiceImpl) Login(ctx context.Context, reqBody dto.AuthLoginReques
 }
 
 // ForgotPassword sends password reset code to user email
+// Uses DB transaction to ensure atomicity
 func (s *authServiceImpl) ForgotPassword(ctx context.Context, reqBody dto.AuthForgotPasswordRequest) error {
 	// Find user by email
 	user, err := s.repositories.User.FindByEmail(ctx, reqBody.Email)
@@ -263,36 +313,50 @@ func (s *authServiceImpl) ForgotPassword(ctx context.Context, reqBody dto.AuthFo
 		return nil
 	}
 
-	// Delete old reset codes
-	_ = s.repositories.VerificationCode.DeleteByUser(ctx, user.ID, "RESET_PASSWORD")
-
 	// Generate OTP
 	otp, err := helpers.GenerateOTP()
 	if err != nil {
 		return exceptions.NewInternalServerError("failed to generate reset code")
 	}
 
-	// Save reset code
-	expiredMinutes := 10
-	verificationCode := models.VerificationCode{
-		UserID:    user.ID,
-		Code:      otp,
-		Purpose:   "RESET_PASSWORD",
-		ExpiredAt: time.Now().Add(time.Duration(expiredMinutes) * time.Minute),
-	}
+	// Start transaction
+	err = s.repositories.DB.Transaction(func(tx *gorm.DB) error {
+		txRepos := s.repositories.WithTx(tx)
 
-	_, err = s.repositories.VerificationCode.Create(ctx, verificationCode)
+		// Delete old reset codes
+		err = txRepos.VerificationCode.DeleteByUser(ctx, user.ID, "RESET_PASSWORD")
+		if err != nil {
+			return err
+		}
+
+		// Save reset code
+		expiredMinutes := 10
+		verificationCode := models.VerificationCode{
+			UserID:    user.ID,
+			Code:      otp,
+			Purpose:   "RESET_PASSWORD",
+			ExpiredAt: time.Now().Add(time.Duration(expiredMinutes) * time.Minute),
+		}
+
+		_, err = txRepos.VerificationCode.Create(ctx, verificationCode)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		return exceptions.NewInternalServerError("failed to save reset code")
 	}
 
-	// Send reset email
+	// Send reset email (outside transaction)
 	emailData := struct {
 		OTP            string
 		ExpiredMinutes int
 	}{
 		OTP:            otp,
-		ExpiredMinutes: expiredMinutes,
+		ExpiredMinutes: 10,
 	}
 
 	err = s.mailProvider.SendMail(
@@ -309,17 +373,12 @@ func (s *authServiceImpl) ForgotPassword(ctx context.Context, reqBody dto.AuthFo
 }
 
 // ResetPassword resets user password with OTP code
+// Uses DB transaction to ensure atomicity
 func (s *authServiceImpl) ResetPassword(ctx context.Context, reqBody dto.AuthResetPasswordRequest) error {
 	// Find user by email
 	user, err := s.repositories.User.FindByEmail(ctx, reqBody.Email)
 	if err != nil {
 		return exceptions.NewNotFoundError("user not found")
-	}
-
-	// Find and validate reset code
-	_, err = s.repositories.VerificationCode.FindValidCode(ctx, user.ID, reqBody.Otp, "RESET_PASSWORD")
-	if err != nil {
-		return exceptions.NewBadRequestError("invalid or expired reset code", nil)
 	}
 
 	// Hash new password
@@ -328,15 +387,39 @@ func (s *authServiceImpl) ResetPassword(ctx context.Context, reqBody dto.AuthRes
 		return exceptions.NewInternalServerError("failed to hash password")
 	}
 
-	// Update password
-	user.Password = string(hashedPassword)
-	_, err = s.repositories.User.Update(ctx, int(user.ID), user)
+	// Start transaction
+	err = s.repositories.DB.Transaction(func(tx *gorm.DB) error {
+		txRepos := s.repositories.WithTx(tx)
+
+		// Find and validate reset code
+		_, err = txRepos.VerificationCode.FindValidCode(ctx, user.ID, reqBody.Otp, "RESET_PASSWORD")
+		if err != nil {
+			return exceptions.NewBadRequestError("invalid or expired reset code", nil)
+		}
+
+		// Update password
+		user.Password = string(hashedPassword)
+		_, err = txRepos.User.Update(ctx, int(user.ID), user)
+		if err != nil {
+			return err
+		}
+
+		// Delete used reset code
+		err = txRepos.VerificationCode.DeleteByUser(ctx, user.ID, "RESET_PASSWORD")
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
+		// Check if it's already our custom error
+		if _, ok := err.(*exceptions.AppError); ok {
+			return err
+		}
 		return exceptions.NewInternalServerError("failed to reset password")
 	}
-
-	// Delete used reset code
-	_ = s.repositories.VerificationCode.DeleteByUser(ctx, user.ID, "RESET_PASSWORD")
 
 	return nil
 }
