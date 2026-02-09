@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/huda7077/gin-and-gorm-boilerplate/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -18,9 +17,6 @@ func ConnectDatabase() {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database")
-	}
-	if err := db.AutoMigrate(models.AllModels...); err != nil {
-		log.Fatal(err)
 	}
 	DB = db
 	log.Println("Database connected")

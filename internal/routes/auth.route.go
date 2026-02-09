@@ -19,7 +19,16 @@ func AuthRoutes(rg *gin.RouterGroup, repos *repositories.Repositories, config co
 	// Setup routes
 	auth := rg.Group("/auth")
 	{
-		auth.POST("/login", authController.Login)
+		// Registration & Verification
 		auth.POST("/register", authController.Register)
+		auth.POST("/verify-email", authController.VerifyEmail)
+		auth.POST("/resend-verification", authController.ResendVerificationCode)
+
+		// Login
+		auth.POST("/login", authController.Login)
+
+		// Password Reset
+		auth.POST("/forgot-password", authController.ForgotPassword)
+		auth.POST("/reset-password", authController.ResetPassword)
 	}
 }

@@ -8,7 +8,7 @@ import (
 )
 
 type Product struct {
-	Id        uuid.UUID      `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	Name      string         `gorm:"type:varchar(100)" json:"name"`
 	Price     int            `gorm:"check:price >= 0 AND price <= 1000000" json:"price"`
 	Stock     *int           `gorm:"check:stock >= 0 AND stock <= 100" json:"stock"`

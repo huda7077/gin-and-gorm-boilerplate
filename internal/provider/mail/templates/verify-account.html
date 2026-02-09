@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Account Verification</title>
+  </head>
+  <body
+    style="
+      font-family: Arial, Helvetica, sans-serif;
+      background-color: #ffffff;
+      color: #111827;
+      font-size: 16px;
+      line-height: 1.5;
+      padding: 20px;
+    "
+  >
+    <p>Hello,</p>
+    <p>Please use the following OTP code to verify your account:</p>
+    <p
+      style="
+        font-size: 24px;
+        font-weight: bold;
+        letter-spacing: 4px;
+        color: #2563eb;
+      "
+    >
+      {{.OTP}}
+    </p>
+    <p>This code is valid for {{.ExpiredMinutes}} minutes.</p>
+    <p>Thank you 🙏</p>
+  </body>
+</html>
