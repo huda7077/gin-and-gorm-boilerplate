@@ -9,6 +9,14 @@ A production-ready, feature-rich REST API boilerplate built with **Gin Framework
 
 ---
 
+## 🖥️ Demo / Live Preview
+
+Try here: [Swagger UI](https://gin-and-gorm-boilerplate.muhammadmasyhuda.my.id/docs/index.html)
+
+---
+
+---
+
 ## 📋 Table of Contents
 
 - [Features](#-features)
@@ -161,6 +169,7 @@ gin-and-gorm-boilerplate/
 ├── go.mod                          # Go module dependencies
 ├── go.sum
 ├── Makefile                        # Build commands
+├── openapi.yaml                    # OpenAPI
 └── README.md                       # This file
 ```
 

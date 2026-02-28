@@ -6,6 +6,8 @@ import (
 	"github.com/huda7077/gin-and-gorm-boilerplate/internal/middlewares"
 	"github.com/huda7077/gin-and-gorm-boilerplate/internal/repositories"
 	"github.com/huda7077/gin-and-gorm-boilerplate/internal/validators"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // SetupRouter initializes all routes for the application
@@ -24,6 +26,12 @@ func SetupRouter(repos *repositories.Repositories, config configs.Config) *gin.E
 
 	// Apply global error handling middleware
 	r.Use(middlewares.ErrorMiddleware())
+
+	// Serve OpenAPI documentation
+	r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
+		ginSwagger.URL("/api/docs/openapi.yaml"),
+	))
+	r.StaticFile("/api/docs/openapi.yaml", "./openapi.yaml")
 
 	// Setup API routes
 	api := r.Group("/api")

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/huda7077/gin-and-gorm-boilerplate/configs"
@@ -23,9 +24,17 @@ func main() {
 	// Setup router with dependencies
 	r := routes.SetupRouter(repos, config)
 
+	r.LoadHTMLFiles("index.html")
+	// Root endpoint
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"title": "Gin and Gorm Boilerplate",
+		})
+	})
+
 	// Health check endpoint
 	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
+		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})
 	})

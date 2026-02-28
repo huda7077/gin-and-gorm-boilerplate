@@ -1,0 +1,607 @@
+openapi: 3.0.3
+info:
+  title: Gin & GORM Boilerplate API
+  description: |
+    Welcome to the Gin & GORM Boilerplate, a Production-ready REST API built with **Gin Framework** and **GORM** following clean architecture principles.
+
+    ## Features
+    - 🔐 JWT-based Authentication
+    - 📧 Email Verification via OTP
+    - 🔑 Password Reset via OTP
+    - 🛡️ Role-based Access Control (USER / ADMIN)
+    - ✅ Input Validation & Centralized Error Handling
+
+    ## Authentication Flow
+    1. **Register** → receive OTP via email
+    2. **Verify Email** → activate account
+    3. **Login** → receive Bearer JWT token
+    4. Use the `Authorize` button (🔒) above to set your token and access protected routes
+
+    ## Password Reset Flow
+    1. **Forgot Password** → receive OTP via email
+    2. **Reset Password** → set new password with OTP
+
+    ## Error Format
+    All error responses follow a consistent structure:
+    ```json
+    {
+      "success": false,
+      "message": "Descriptive error message",
+      "data": { "field": "fieldName", "message": "validation detail" }
+    }
+    ```
+
+  version: 1.0.0
+  contact:
+    name: huda7077
+    url: https://github.com/huda7077/gin-and-gorm-boilerplate
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000/api
+    description: Local Development Server
+
+tags:
+  - name: Auth
+    description: Registration, verification, login, and password management
+  - name: Protected
+    description: Endpoints that require a valid JWT Bearer token
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Enter your JWT token. You can obtain it from the `POST /auth/login` endpoint.
+        Example: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
+  schemas:
+    # ─── Success Response Wrapper ───────────────────────────────────────────────
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "operation successful"
+        data:
+          nullable: true
+          description: Response payload (null when not applicable)
+
+    # ─── Error Response Wrapper ──────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "error message"
+        data:
+          nullable: true
+          description: Validation details or additional error info
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Validation Error"
+        data:
+          type: object
+          properties:
+            field:
+              type: string
+              example: "Email"
+            message:
+              type: string
+              example: "Email is required"
+
+    # ─── User ────────────────────────────────────────────────────────────────────
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        role:
+          type: string
+          enum: [USER, ADMIN]
+          example: "USER"
+        image:
+          type: string
+          nullable: true
+          example: null
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-02-28T10:00:00Z"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-02-28T10:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-02-28T10:00:00Z"
+
+    # ─── Auth Request Bodies ─────────────────────────────────────────────────────
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        password:
+          type: string
+          description: Must be a strong password (validated by custom `strongpassword` rule)
+          example: "P@ssw0rd123"
+
+    VerifyEmailRequest:
+      type: object
+      required:
+        - email
+        - otp
+      properties:
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        otp:
+          type: string
+          description: 6-digit OTP code received via email (valid for 10 minutes)
+          example: "482910"
+
+    ResendVerificationRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        password:
+          type: string
+          example: "P@ssw0rd123"
+
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+
+    ResetPasswordRequest:
+      type: object
+      required:
+        - email
+        - otp
+        - newPassword
+      properties:
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        otp:
+          type: string
+          description: 6-digit OTP code received via email
+          example: "371024"
+        newPassword:
+          type: string
+          minLength: 6
+          example: "NewP@ssw0rd456"
+
+    # ─── Auth Response Bodies ────────────────────────────────────────────────────
+    LoginResponseData:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/UserResponse"
+        token:
+          type: string
+          description: JWT Bearer token — use this in the Authorization header for protected routes
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoiam9obkBleGFtcGxlLmNvbSIsInJvbGUiOiJVU0VSIn0.signature"
+
+paths:
+  # ──────────────────────────────────────────────────────────────────────────────
+  # AUTH ROUTES
+  # ──────────────────────────────────────────────────────────────────────────────
+
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      description: |
+        Creates a new user account and sends a **6-digit OTP** to the provided email address.
+
+        > ⚠️ The account must be **verified** before login is allowed.
+
+        **Password requirements:** Must pass `strongpassword` validation (check your validator config for exact rules).
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            examples:
+              default:
+                summary: Standard registration
+                value:
+                  name: "John Doe"
+                  email: "john@example.com"
+                  password: "P@ssw0rd123"
+      responses:
+        "201":
+          description: Registration successful — OTP sent to email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+              example:
+                success: true
+                message: "registration successful, please check your email for verification code"
+                data: null
+        "400":
+          description: Validation error (missing/invalid fields)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+              example:
+                success: false
+                message: "Validation Error"
+                data:
+                  field: "Password"
+                  message: "Password does not meet strength requirements"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: "email already registered"
+                data: null
+
+  /auth/verify-email:
+    post:
+      tags:
+        - Auth
+      summary: Verify email with OTP
+      description: |
+        Verifies a user's email address using the **6-digit OTP** sent after registration.
+
+        - OTP is valid for **10 minutes** and can only be used **once**
+        - After verification, the user can log in
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+            examples:
+              default:
+                summary: Verify with OTP
+                value:
+                  email: "john@example.com"
+                  otp: "482910"
+      responses:
+        "200":
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+              example:
+                success: true
+                message: "email verified successfully"
+                data: null
+        "400":
+          description: Invalid or expired OTP, or email not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: "invalid or expired OTP"
+                data: null
+
+  /auth/resend-verification:
+    post:
+      tags:
+        - Auth
+      summary: Resend verification OTP
+      description: |
+        Resends a new **6-digit OTP** verification code to the given email.
+
+        Use this if the original OTP expired or was not received.
+      operationId: resendVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendVerificationRequest"
+            examples:
+              default:
+                summary: Resend to email
+                value:
+                  email: "john@example.com"
+      responses:
+        "200":
+          description: New OTP sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+              example:
+                success: true
+                message: "verification code sent successfully"
+                data: null
+        "400":
+          description: Invalid email or account already verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: "account is already verified"
+                data: null
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login user
+      description: |
+        Authenticates a user and returns a **JWT Bearer token**.
+
+        > ⚠️ Email must be **verified** before login is allowed.
+
+        **How to use the token:**
+        1. Copy the `token` value from the response
+        2. Click the `Authorize` button 🔒 at the top of this page
+        3. Enter: `<your_token>` (without the `Bearer ` prefix — Swagger adds it automatically)
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              default:
+                summary: Standard login
+                value:
+                  email: "john@example.com"
+                  password: "P@ssw0rd123"
+      responses:
+        "200":
+          description: Login successful — returns user info and JWT token
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/LoginResponseData"
+              example:
+                success: true
+                message: "login successful"
+                data:
+                  user:
+                    id: 1
+                    name: "John Doe"
+                    email: "john@example.com"
+                    role: "USER"
+                    image: null
+                    verifiedAt: "2026-02-28T10:00:00Z"
+                    createdAt: "2026-02-28T09:00:00Z"
+                    updatedAt: "2026-02-28T09:00:00Z"
+                  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+        "401":
+          description: Invalid credentials or email not verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: "invalid email or password"
+                data: null
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Auth
+      summary: Request password reset OTP
+      description: |
+        Sends a **password reset OTP** to the given email address.
+
+        > 🔐 For security, the response is always the same whether or not the email exists (to prevent email enumeration).
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+            examples:
+              default:
+                summary: Request reset for email
+                value:
+                  email: "john@example.com"
+      responses:
+        "200":
+          description: Reset OTP sent (if the email exists in the system)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+              example:
+                success: true
+                message: "reset code has been sent, please check your email"
+                data: null
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Auth
+      summary: Reset password with OTP
+      description: |
+        Resets the user's password using the **OTP** received via email after calling `forgot-password`.
+
+        - OTP is valid for **10 minutes** and can only be used **once**
+        - After resetting, use the new password to log in
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+            examples:
+              default:
+                summary: Reset with OTP
+                value:
+                  email: "john@example.com"
+                  otp: "371024"
+                  newPassword: "NewP@ssw0rd456"
+      responses:
+        "200":
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+              example:
+                success: true
+                message: "password reset successful"
+                data: null
+        "400":
+          description: Invalid or expired OTP, or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                message: "invalid or expired OTP"
+                data: null
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # PROTECTED ROUTES
+  # ──────────────────────────────────────────────────────────────────────────────
+
+  /protected/profile:
+    get:
+      tags:
+        - Protected
+      summary: Validate token & get profile info
+      description: |
+        A protected endpoint that validates the JWT token.
+
+        Returns a success response when the token is valid. The JWT payload contains:
+        - `userId` — the authenticated user's ID
+        - `email` — the authenticated user's email
+        - `role` — the authenticated user's role (`USER` or `ADMIN`)
+
+        > 🔒 **Requires:** `Authorization: Bearer <token>` header
+      operationId: getProfile
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+              example:
+                success: true
+                message: "token valid"
+                data: null
+        "401":
+          description: Missing, invalid, or expired token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              examples:
+                missing_header:
+                  summary: No Authorization header
+                  value:
+                    error: "Authorization header is required"
+                invalid_format:
+                  summary: Missing Bearer prefix
+                  value:
+                    error: "Invalid token format"
+                invalid_token:
+                  summary: Invalid or expired JWT
+                  value:
+                    error: "Invalid or expired token"
