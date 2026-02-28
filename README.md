@@ -264,7 +264,7 @@ SMTP_FROM=your-email@gmail.com
 
 ## 🗄️ Database Migration
 
-### Using Atlas (Recommended)
+### Using Atlas
 
 **1. Create a new migration:**
 
@@ -288,6 +288,32 @@ atlas migrate apply \
 atlas migrate status \
   --env local \
   --url "postgres://user:pass@localhost:5432/dbname?sslmode=disable"
+```
+
+### Using Make Commands (Recommended)
+
+**1. Create a new migration:**
+
+```bash
+make migrate-diff name=add_table_users
+```
+
+**2. Apply migrations:**
+
+```bash
+make migrate-apply
+```
+
+**3. Check migration status:**
+
+```bash
+make migrate-status
+```
+
+**3. Rollback last migration:**
+
+```bash
+make migrate-down
 ```
 
 ### Manual Migration
