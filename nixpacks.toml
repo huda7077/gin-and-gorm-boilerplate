@@ -1,0 +1,15 @@
+# nixpacks.toml — Coolify deployment configuration
+# Coolify uses Nixpacks by default to detect and build projects.
+# This file explicitly overrides the auto-detected build & start commands
+
+[phases.setup]
+# Ensure Go and make are available in the build environment
+nixPkgs = ["go", "gnumake", "atlas"]
+
+[phases.build]
+# Build the binary using Makefile
+cmds = ["make build"]
+
+[start]
+# Run the pre-built binary (produced by `make build` → ./tmp/main)
+cmd = "make start"

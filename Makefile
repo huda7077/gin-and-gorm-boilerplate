@@ -19,9 +19,15 @@ build:
 	@mkdir -p tmp
 	@go build -o $(BINARY) $(MAIN_FILE)
 
-# Run binary
+# Run binary (development: build then run)
 run: build
 	@echo "🚀 Running $(APP_NAME) binary..."
+	@$(BINARY)
+
+# Start for production (no rebuild — binary must already exist)
+# Used by Coolify / Nixpacks after `make build`
+start:
+	@echo "🚀 Starting $(APP_NAME)..."
 	@$(BINARY)
 
 # Create DB container
@@ -73,4 +79,4 @@ migrate-down:
 	@atlas migrate down --env gorm; 
 
 
-.PHONY: all build run clean watch docker-up docker-down migrate-diff migrate-apply migrate-status migrate-down migrate-reset
+.PHONY: all build run start clean watch docker-up docker-down migrate-diff migrate-apply migrate-status migrate-down migrate-reset

@@ -1,9 +1,9 @@
 package configs
 
 import (
+	"log"
 	"os"
 
-	"github.com/huda7077/gin-and-gorm-boilerplate/pkg/exceptions"
 	"github.com/joho/godotenv"
 )
 
@@ -18,7 +18,8 @@ func (config *configImpl) Get(key string) string {
 }
 
 func New(filenames ...string) Config {
-	err := godotenv.Load(filenames...)
-	exceptions.PanicLogging(err)
+	if err := godotenv.Load(filenames...); err != nil {
+		log.Println("[config] .env file not found, using system environment variables")
+	}
 	return &configImpl{}
 }
