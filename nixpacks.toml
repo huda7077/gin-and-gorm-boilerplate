@@ -4,12 +4,17 @@
 
 [phases.setup]
 # Ensure Go and make are available in the build environment
-nixPkgs = ["...","gnumake", "atlas"]
+nixPkgs = ["go","gnumake", "atlas"]
+
+[phases.install]
+cmds = ["go mod download"]
 
 [phases.build]
 # Build the binary using Makefile
 cmds = ["make build"]
+dependsOn =["install"]
 
 [start]
 # Run the pre-built binary (produced by `make build` → ./tmp/main)
 cmd = "go version && ./tmp/main"
+dependsOn =["build"]
