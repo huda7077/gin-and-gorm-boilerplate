@@ -8,8 +8,8 @@ nixPkgs = ["...","gnumake", "go", "atlas"]
 
 [phases.build]
 # Build the binary using Makefile
-cmds = ["make build", "make migrate-apply"]
+cmds = ["make build"]
 
 [start]
 # Run the pre-built binary (produced by `make build` → ./tmp/main)
-cmd = "./tmp/main"
+cmd = "make migrate-apply && ./tmp/main"
