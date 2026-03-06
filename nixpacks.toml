@@ -4,7 +4,7 @@
 
 [phases.setup]
 # Ensure Go and make are available in the build environment
-aptPkgs = ["make"]
+aptPkgs = ["...", "build-essential"]
 nixPkgs = ["...", "go", "atlas"]
 
 [phases.build]
