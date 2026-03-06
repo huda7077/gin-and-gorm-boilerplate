@@ -4,10 +4,11 @@
 
 [phases.setup]
 # Ensure Go and make are available in the build environment
-nixPkgs = ["go","gnumake", "atlas"]
+nixPkgs = ["go","gnumake"]
 
 [phases.install]
-cmds = ["go mod download"]
+# Installing all go.mod depedencies and atlas
+cmds = ["go mod download", "curl -sSf https://atlasgo.sh | sh"]
 
 [phases.build]
 # Build the binary using Makefile
