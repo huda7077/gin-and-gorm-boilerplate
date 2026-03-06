@@ -3,12 +3,13 @@
 # This file explicitly overrides the auto-detected build & start commands
 
 [phases.setup]
-# Ensure Go and make are available in the build environment
+# Ensure Go, make, and atlas are available in the build environment
 nixPkgs = ["go","gnumake"]
+cmds = ["curl -sSf https://atlasgo.sh | sh"]
 
 [phases.install]
-# Installing all go.mod depedencies and atlas
-cmds = ["go mod download", "curl -sSf https://atlasgo.sh | sh"]
+# Installing all go.mod depedencies
+cmds = ["go mod download"]
 
 [phases.build]
 # Build the binary using Makefile
