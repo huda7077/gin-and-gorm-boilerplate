@@ -4,13 +4,12 @@
 
 [phases.setup]
 # Ensure Go and make are available in the build environment
-aptPkgs = ["...", "build-essential"]
-nixPkgs = ["...", "gnumake", "go", "atlas"]
+nixPkgs = ["...", "go", "atlas"]
 
 [phases.build]
 # Build the binary using Makefile
-cmds = ["make -v"]
+cmds = ["atlas version", "- go build -o ./tmp/main   ./cmd/server/main.go"]
 
 [start]
 # Run the pre-built binary (produced by `make build` → ./tmp/main)
-cmd = "make -v"
+cmd = "./tmp/main"
