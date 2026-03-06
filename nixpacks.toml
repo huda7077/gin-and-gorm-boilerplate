@@ -12,4 +12,4 @@ cmds = ["make build"]
 
 [start]
 # Run the pre-built binary (produced by `make build` → ./tmp/main)
-cmd = "curl -V && ./tmp/main"
+cmd = "go version && ./tmp/main"
