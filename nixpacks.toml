@@ -4,7 +4,7 @@
 
 [phases.setup]
 # Ensure Go and make are available in the build environment
-nixPkgs = ["...","gnumake", "go", "atlas"]
+nixPkgs = ["...","gnumake", "atlas"]
 
 [phases.build]
 # Build the binary using Makefile
