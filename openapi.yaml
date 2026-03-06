@@ -39,6 +39,8 @@ info:
     name: MIT
 
 servers:
+  - url: https://gin-and-gorm-boilerplate.muhammadmasyhuda.my.id/api
+    description: Production Server
   - url: http://localhost:8000/api
     description: Local Development Server
 
