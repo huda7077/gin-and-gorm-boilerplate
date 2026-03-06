@@ -6,11 +6,9 @@
 # Ensure Go, make, and atlas are available in the build environment
 nixPkgs = ["go","gnumake"]
 cmds = [
-  "curl -sSf https://atlasgo.sh | sh -s -- -y",
-  "mkdir -p /usr/local/bin",
-  "find /root /usr -name atlas -type f -exec cp {} /usr/local/bin/atlas \; -quit 2>/dev/null || true",
+    "curl -sSf https://atlasgo.sh | sh -s -- -y",
+  "cp /root/.local/bin/atlas /usr/local/bin/atlas 2>/dev/null || cp /usr/bin/atlas /usr/local/bin/atlas 2>/dev/null || true",
   "chmod +x /usr/local/bin/atlas",
-  "echo 'PATH=$PATH:/usr/local/bin' >> /etc/profile",
   "atlas version"
 ]
 
