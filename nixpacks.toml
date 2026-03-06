@@ -11,10 +11,10 @@ cmds = ["go mod download"]
 
 [phases.build]
 # Build the binary using Makefile
-cmds = ["make build"]
+cmds = ["make build", "make migrate-apply"]
 dependsOn =["install"]
 
 [start]
 # Run the pre-built binary (produced by `make build` → ./tmp/main)
-cmd = "go version && ./tmp/main"
+cmd = "./tmp/main"
 dependsOn =["build"]
