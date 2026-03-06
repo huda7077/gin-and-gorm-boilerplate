@@ -5,7 +5,7 @@
 [phases.setup]
 # Ensure Go, make, and atlas are available in the build environment
 nixPkgs = ["go","gnumake"]
-cmds = ["curl -sSf https://atlasgo.sh | sh -s -- -y && mv /root/.atlas/bin/atlas /usr/local/bin/atlas && chmod +x /usr/local/bin/atlas"]
+cmds = ["curl -sSf https://atlasgo.sh | sh -s -- -y"]
 
 [phases.install]
 # Installing all go.mod depedencies
