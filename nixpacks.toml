@@ -9,8 +9,8 @@ nixPkgs = ["...", "gnumake", "go", "atlas"]
 
 [phases.build]
 # Build the binary using Makefile
-cmds = ["make build"]
+cmds = ["make -v"]
 
 [start]
 # Run the pre-built binary (produced by `make build` → ./tmp/main)
-cmd = "make start"
+cmd = "make -v"
