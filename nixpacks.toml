@@ -8,7 +8,7 @@ nixPkgs = ["...", "go", "atlas"]
 
 [phases.build]
 # Build the binary using Makefile
-cmds = ["atlas version", "- go build -o ./tmp/main   ./cmd/server/main.go"]
+cmds = ["atlas version", "go build -o ./tmp/main   ./cmd/server/main.go"]
 
 [start]
 # Run the pre-built binary (produced by `make build` → ./tmp/main)
