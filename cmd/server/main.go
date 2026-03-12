@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/huda7077/gin-and-gorm-boilerplate/configs"
@@ -24,13 +25,24 @@ func main() {
 	// Setup router with dependencies
 	r := routes.SetupRouter(repos, config)
 
-	r.LoadHTMLFiles("index.html")
-	// Root endpoint
-	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", gin.H{
-			"title": "Gin and Gorm Boilerplate",
+	// Load landing page template (relative to binary working directory)
+	if _, err := os.Stat("index.html"); err == nil {
+		r.LoadHTMLFiles("index.html")
+		r.GET("/", func(c *gin.Context) {
+			c.HTML(http.StatusOK, "index.html", gin.H{
+				"title": "Gin and Gorm Boilerplate",
+			})
 		})
-	})
+	} else {
+		// Fallback: return JSON if index.html is not found (e.g. after go install)
+		r.GET("/", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Gin & GORM Boilerplate API",
+				"status":  "running",
+				"docs":    "/ping",
+			})
+		})
+	}
 
 	// Health check endpoint
 	r.GET("/ping", func(c *gin.Context) {
